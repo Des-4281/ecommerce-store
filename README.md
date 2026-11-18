@@ -1,24 +1,26 @@
 # E-Commerce Store
 
-An online store built with React, TypeScript, Redux Toolkit, React Query, and Firebase Authentication. Products come from the [FakeStoreAPI](https://fakestoreapi.com/). Users can filter by category, add items to a cart, check out, and create an account or log in.
+An online store built with React, TypeScript, Redux Toolkit, React Query, and Firebase. Users create an account, browse products stored in Firestore, add them to a cart, and place orders that are saved to their order history. Logged-in users can also add, edit, and delete products.
 
 ## Features
 
-- **Product catalog.** Each product shows its image, title, price, category, description, rating, and an Add to Cart button.
-- **Category filter.** The dropdown is built from the API's category list.
-- **Image fallback.** If a product image fails to load, a "No image" placeholder is shown.
-- **Shopping cart.** Change item counts with − and +, remove items, and see the total item count and price. The navbar badge shows the item count on every page.
-- **Cart saved in sessionStorage.** The cart survives page refreshes until the tab is closed.
-- **Checkout.** Clears the cart and shows a confirmation message.
-- **User accounts.** Register, log in, and log out with Firebase Authentication. The navbar shows the logged-in user's email and a Logout button.
+- **User accounts.** Register, log in, and log out with Firebase Authentication (email and password). Registering also creates the user's profile document in Firestore.
+- **Profile page.** View your profile, edit your name and address, or delete your account. Deleting removes both the Firestore profile and the login.
+- **Products from Firestore.** Products are stored in a Firestore `products` collection. Each product shows its image, title, price, category, description, and an Add to Cart button.
+- **Category filter.** The dropdown is built from the categories of the products in Firestore.
+- **Product management.** On the Manage Products page, logged-in users can add, edit, and delete products. A one-time button imports the FakeStore products into an empty collection.
+- **Shopping cart.** Change item counts with − and +, remove items, and see the total item count and price. The cart is saved in sessionStorage, so it survives page refreshes.
+- **Orders.** Checkout (login required) saves the order to Firestore with every product, the total, the user's ID, and the date.
+- **Order history.** The Orders page lists your past orders with the order ID, date, item count, and total. Click an order to see its products and total.
+- **Protected pages.** Profile, Orders, and Manage Products send logged-out visitors to the login page.
 
 ## Tech stack
 
 - React 19 + TypeScript
 - Vite
+- Firebase Authentication + Cloud Firestore
+- TanStack React Query (products and orders)
 - Redux Toolkit + React Redux (cart)
-- TanStack React Query (products and categories)
-- Firebase Authentication
 - React Router
 - React-Bootstrap
 
@@ -35,21 +37,45 @@ An online store built with React, TypeScript, Redux Toolkit, React Query, and Fi
 2. Set up Firebase:
    - Create a project in the [Firebase Console](https://console.firebase.google.com/).
    - Under **Authentication > Sign-in method**, turn on **Email/Password**.
+   - Under **Firestore Database**, create a database.
    - Under **Project settings > General**, add a **Web app** and copy its config values.
 
-3. Copy `.env.example` to `.env.local` and fill in the values:
+3. In **Firestore Database > Rules**, paste these rules and click **Publish**:
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{userId} {
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+       }
+       match /products/{productId} {
+         allow read: if true;
+         allow write: if request.auth != null;
+       }
+       match /orders/{orderId} {
+         allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+         allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+       }
+     }
+   }
+   ```
+
+4. Copy `.env.example` to `.env.local` and fill in the values:
 
    ```bash
    cp .env.example .env.local
    ```
 
-4. Start the app:
+5. Start the app:
 
    ```bash
    npm run dev
    ```
 
    Then open http://localhost:5173.
+
+6. Add products: register, log in, open **Manage Products**, and click **Import FakeStore products** once.
 
 `.env.local` is listed in `.gitignore`, so your Firebase keys are not committed.
 
@@ -62,40 +88,59 @@ An online store built with React, TypeScript, Redux Toolkit, React Query, and Fi
 
 ## Pages
 
-| Page | URL | What it does |
+| Page | URL | Login required | What it does |
+|---|---|---|---|
+| Home | `/` | No | Product list, category filter, Add to Cart |
+| Cart | `/cart` | To check out | Cart contents, totals, Place order |
+| Login | `/login` | No | Log in with email and password |
+| Register | `/register` | No | Create an account and profile |
+| Profile | `/profile` | Yes | View, edit, or delete your account |
+| Manage Products | `/admin/products` | Yes | Add, edit, and delete products |
+| Order History | `/orders` | Yes | List of your orders |
+| Order Detail | `/orders/:orderId` | Yes | Products and total for one order |
+| Not found | any other URL | No | "Page not found" message |
+
+## Firestore data
+
+| Collection | Document ID | Fields |
 |---|---|---|
-| Home | `/` | Product list, category filter, Add to Cart |
-| Cart | `/cart` | Cart contents, totals, Checkout |
-| Login | `/login` | Log in with email and password |
-| Register | `/register` | Create an account |
-| Not found | any other URL | "Page not found" message |
+| `users` | The user's auth UID | `email`, `name`, `address`, `createdAt` |
+| `products` | Generated by Firestore | `title`, `price`, `description`, `category`, `image`, `rating` (optional) |
+| `orders` | Generated by Firestore | `userId`, `items` (id, title, price, image, count), `totalItems`, `total`, `createdAt` |
 
 ## Project structure
 
 ```
 src/
-  main.tsx                     Wraps the app in Router, Redux, React Query, and Auth providers
-  App.tsx                      NavBar and routes
-  firebaseConfig.ts            Firebase setup (reads keys from .env.local)
-  authErrors.ts                Turns Firebase error codes into readable messages
-  types.ts                     Product and CartItem types
-  api/fakeStore.ts             FakeStoreAPI fetch functions
-  hooks/useStoreQueries.ts     React Query hooks for products and categories
-  context/authContext.ts       Auth context and the useAuth hook
-  context/AuthProvider.tsx     Tracks the logged-in user with onAuthStateChanged
-  redux/cartSlice.ts           Cart state, actions, selectors, and sessionStorage helpers
-  redux/store.ts               Redux store; saves the cart after every change
-  components/NavBar.tsx        Navigation, cart badge, and login/logout links
-  components/ProductCard.tsx   One product with its Add to Cart button
-  components/ProductImage.tsx  Image with a placeholder fallback
-  pages/                       Home, Cart, Login, Register, and Not Found pages
+  main.tsx                       Wraps the app in Router, Redux, React Query, and Auth providers
+  App.tsx                        NavBar and routes
+  firebaseConfig.ts              Firebase setup; exports auth and db (reads keys from .env.local)
+  authErrors.ts                  Turns Firebase error codes into readable messages
+  types.ts                       Product, CartItem, UserProfile, and Order types
+  api/products.ts                Firestore product reads and writes, plus the one-time import
+  api/orders.ts                  Create an order, fetch a user's orders, fetch one order
+  api/fakeStore.ts               FakeStoreAPI fetch, used only by the import
+  hooks/useStoreQueries.ts       React Query hooks for products, categories, and product changes
+  hooks/useOrders.ts             React Query hooks for orders
+  context/authContext.ts         Auth context and the useAuth hook
+  context/AuthProvider.tsx       Tracks the logged-in user with onAuthStateChanged
+  redux/cartSlice.ts             Cart state, actions, selectors, and sessionStorage helpers
+  redux/store.ts                 Redux store; saves the cart after every change
+  components/NavBar.tsx          Navigation, cart badge, and account links
+  components/ProductCard.tsx     One product with its Add to Cart button
+  components/ProductImage.tsx    Image with a placeholder fallback
+  components/RequireAuth.tsx     Sends logged-out visitors to the login page
+  pages/                         Home, Cart, Login, Register, Profile, Manage Products,
+                                 Order History, Order Detail, and Not Found pages
 ```
 
 ## How it works
 
-- **React Query** handles server data (products and categories): fetching, caching, and loading and error states.
-- **Redux Toolkit** handles the cart. Totals are calculated by selectors, and `store.subscribe` saves the cart to sessionStorage after every change.
 - **Firebase Auth** handles accounts. `AuthProvider` listens with `onAuthStateChanged` and shares `user` and `loading` through React Context. Components read them with `useAuth()`.
+- **Firestore** stores users, products, and orders. A user's profile document uses their auth UID as its ID, and each order stores the `userId` of who placed it, which is how Order History finds only your orders (`where("userId", "==", uid)`).
+- **React Query** fetches products and orders and caches them. After a product is added, edited, or deleted, or an order is placed, `invalidateQueries` refetches the data so every page shows the change.
+- **Redux Toolkit** handles the cart. Totals are calculated by selectors, and `store.subscribe` saves the cart to sessionStorage after every change.
+- **Security rules** let each user read and write only their own profile and orders. Anyone can view products; only logged-in users can change them.
 
 ## License
 
