@@ -35,6 +35,9 @@ const NavBar = () => {
             {!loading && 
               (user ? (
                 <>
+                  <Nav.Link as={Link} to="/profile">Profile</Nav.Link> 
+                  <Nav.Link as={Link} to="/orders">Orders</Nav.Link>
+                  <Nav.Link as={Link} to="/admin/products">Manage Products</Nav.Link>
                   <Navbar.Text className="ms-md-3">{user.email}</Navbar.Text>
                   <Button
                     variant="outline-light"

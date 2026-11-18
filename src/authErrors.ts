@@ -14,6 +14,8 @@ export const authErrorMessage = (err: unknown): string => {
         return "Wrong email or password.";
       case "auth/too-many-requests":
         return "Too many attempts. Wait a minute and try again.";
+      case "auth/requires-recent-login":
+        return "For security, log out and log back in, then try deleting again.";
     }
     return err.message;
   }

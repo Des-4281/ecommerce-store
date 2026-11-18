@@ -1,43 +1,61 @@
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Alert, Button, ButtonGroup, Card, Col, Container, ListGroup, Row } from "react-bootstrap";
 import type { AppDispatch } from "../redux/store";
-import {
-  clearCart,
-  removeFromCart,
-  selectCartCount,
-  selectCartItems,
-  selectCartTotal,
-  updateCount,
-} from "../redux/cartSlice";
+import { clearCart, removeFromCart, selectCartCount, selectCartItems, selectCartTotal, updateCount, } from "../redux/cartSlice";
 import ProductImage from "../components/ProductImage";
+import { useAuth } from "../context/authContext";
+import { useCreateOrder } from "../hooks/useOrders";
+
 
 const CartPage = () => {
   const dispatch = useDispatch<AppDispatch>();
   const items = useSelector(selectCartItems);
   const totalCount = useSelector(selectCartCount);
   const totalPrice = useSelector(selectCartTotal);
-  const [checkedOut, setCheckedOut] = useState(false);
 
-  const handleCheckout = () => {
-    dispatch(clearCart()); // empties Redux; store.subscribe clears sessionStorage
-    setCheckedOut(true);
-  };
 
-  if (checkedOut) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const createOrder = useCreateOrder();
+  const [orderId, setOrderId] = useState<string | null>(null); // replaces checkedOut const  
+  const [error, setError] = useState<string | null>(null);
+
+const handleCheckout = async () => {
+  if (!user) {
+    navigate("/login"); // must be logged in to place an order
+    return;
+  }
+  setError(null);
+  try {
+    const id = await createOrder.mutateAsync({ userId: user.uid, items });
+    dispatch(clearCart()); // only clear the cart after the order saved
+    setOrderId(id);
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "Couldn't place your order.");
+  }
+};
+
+
+
+  if (orderId) {
     return (
       <Container>
         <Alert variant="success">
           <Alert.Heading>Thanks for your order!</Alert.Heading>
-          <p className="mb-0">Checkout complete. Your cart has been cleared.</p>
+          <p className="mb-0">Order ID: {orderId}</p>
         </Alert>
-        <Link to="/" className="btn btn-primary">
+        <Link to={`/orders/${orderId}`} className="btn btn-primary me-2">
+          View order
+        </Link>
+        <Link to="/" className="btn btn-outline-primary">
           Keep shopping
         </Link>
       </Container>
     );
   }
+
 
   if (items.length === 0) {
     return (
@@ -114,8 +132,13 @@ const CartPage = () => {
                 <span>Total</span>
                 <span>${totalPrice.toFixed(2)}</span>
               </div>
-              <Button variant="success" className="w-100" onClick={handleCheckout}>
-                Checkout
+              {error && <Alert variant="danger">{error}</Alert>}
+              <Button variant="success" className="w-100" onClick={handleCheckout} disabled={createOrder.isPending}>
+                {createOrder.isPending
+                  ? "Placing order..."
+                  : user
+                    ? "Place order"
+                    : "Log in to check out"}
               </Button>
             </Card.Body>
           </Card>

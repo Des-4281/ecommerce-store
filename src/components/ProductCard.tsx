@@ -30,7 +30,7 @@ const ProductCard = ({ product }: ProductCardProps) => {
         <div className="mt-auto">
           <div className="d-flex justify-content-between mb-2">
             <strong>${product.price.toFixed(2)}</strong>
-            <span>{product.rating.rate}</span>
+            {product.rating && <span>{product.rating.rate}</span>}
           </div>
           <Button
             variant="primary"

@@ -47,7 +47,7 @@ const cartSlice = createSlice({
 
     updateCount: (
       state,
-      action: PayloadAction<{ id: number; count: number }>
+      action: PayloadAction<{ id: string; count: number }>
     ) => {
       const { id, count } = action.payload;
       if (count < 1) {
@@ -58,7 +58,7 @@ const cartSlice = createSlice({
       if (item) item.count = count;
     },
 
-    removeFromCart: (state, action: PayloadAction<number>) => {
+    removeFromCart: (state, action: PayloadAction<string>) => {
       state.items = state.items.filter((item) => item.id !== action.payload);
     },
     clearCart: (state) => {
